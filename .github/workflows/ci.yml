@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # The latest release on every supported host: install, then build and run a
+  # new package with the default toolchain.
+  latest:
+    name: latest (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - id: mcpp
+        uses: ./
+      - name: The output names the active release
+        run: |
+          echo "output: ${{ steps.mcpp.outputs.version }}"
+          [ -n "${{ steps.mcpp.outputs.version }}" ]
+          [ "$(mcpp --version | head -1 | awk '{print $2}')" = "${{ steps.mcpp.outputs.version }}" ]
+          [ "${{ steps.mcpp.outputs.cache-hit }}" = false ]
+      - name: Build and run a new package
+        working-directory: ${{ runner.temp }}
+        run: |
+          mcpp new hello
+          cd hello
+          mcpp build
+          mcpp run
+
+  # A pinned mcpp and xlings, a toolchain line, and the CN mirror.
+  pinned:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - id: mcpp
+        uses: ./
+        with:
+          version: 2026.11.16.1
+          xlings-version: 2026.11.16.1
+          mirror: CN
+          toolchains: |
+            llvm  # one argument list per line
+      - name: The pinned releases are active
+        run: |
+          [ "${{ steps.mcpp.outputs.version }}" = 2026.11.16.1 ]
+          [ "$(mcpp --version | head -1 | awk '{print $2}')" = 2026.11.16.1 ]
+          [ "$(xlings --version | head -1 | awk '{print $2}')" = 2026.11.16.1 ]
+          mcpp toolchain list | grep -E '^ +\*? +llvm '
+
+  # The first job saves the cache; the second, started after it, restores it
+  # by the exact key.
+  cache-save:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          cache: true
+      - working-directory: ${{ runner.temp }}
+        run: mcpp new hello && cd hello && mcpp build
+
+  cache-restore:
+    needs: cache-save
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - id: mcpp
+        uses: ./
+        with:
+          cache: true
+      - name: Restored by the exact key
+        run: '[ "${{ steps.mcpp.outputs.cache-hit }}" = true ]'
+      - working-directory: ${{ runner.temp }}
+        run: mcpp new hello && cd hello && mcpp build && mcpp run

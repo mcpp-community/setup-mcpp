@@ -1,0 +1,66 @@
+name: setup-mcpp
+description: Install mcpp, the C++23 modules build tool, through xlings.
+author: mcpp-community
+branding:
+  icon: package
+  color: blue
+
+inputs:
+  version:
+    description: mcpp release to install, such as 2026.11.16.1, or latest.
+    default: latest
+  xlings-version:
+    description: xlings release that installs mcpp, or latest.
+    default: latest
+  mirror:
+    description: Package mirror for xlings and mcpp, GLOBAL or CN.
+    default: GLOBAL
+  toolchains:
+    description: Toolchains to install, one `mcpp toolchain install` argument list per line.
+    default: ''
+  cache:
+    description: Cache ~/.xlings and ~/.mcpp between runs (true or false).
+    default: 'false'
+
+outputs:
+  version:
+    description: The installed mcpp release.
+    value: ${{ steps.install.outputs.version }}
+  cache-hit:
+    description: "'true' when the cache was restored by its exact key."
+    value: ${{ steps.cache.outputs.cache-hit == 'true' }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      if: inputs.cache == 'true'
+      shell: bash
+      env:
+        SETUP_MCPP_VERSION: ${{ inputs.version }}
+        SETUP_MCPP_XLINGS_VERSION: ${{ inputs.xlings-version }}
+        SETUP_MCPP_TOOLCHAINS: ${{ inputs.toolchains }}
+      run: bash "$GITHUB_ACTION_PATH/setup.sh" resolve
+
+    # The key names the machine (installed binaries are per architecture), both
+    # releases, the toolchain list and the project's lock file.
+    - id: cache
+      if: inputs.cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.xlings
+          ~/.mcpp
+        key: setup-mcpp-${{ runner.os }}-${{ runner.arch }}-xl${{ steps.resolve.outputs.xlings }}-${{ steps.resolve.outputs.mcpp }}-${{ steps.resolve.outputs.toolchains }}-${{ hashFiles('mcpp.lock') }}
+        restore-keys: |
+          setup-mcpp-${{ runner.os }}-${{ runner.arch }}-xl${{ steps.resolve.outputs.xlings }}-${{ steps.resolve.outputs.mcpp }}-
+
+    - id: install
+      shell: bash
+      env:
+        SETUP_MCPP_VERSION: ${{ inputs.version }}
+        SETUP_MCPP_XLINGS_VERSION: ${{ inputs.xlings-version }}
+        SETUP_MCPP_MIRROR: ${{ inputs.mirror }}
+        SETUP_MCPP_TOOLCHAINS: ${{ inputs.toolchains }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: bash "$GITHUB_ACTION_PATH/setup.sh" install

@@ -19,6 +19,11 @@ case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) windows=1; home="$USERPROFILE"; exe=.exe ;;
   *)                        windows=0; home="$HOME";        exe=   ;;
 esac
+# Git Bash converts a POSIX path in an argument for a native program (curl,
+# xlings, mcpp); a workflow may turn that off for its own steps, and this
+# script's paths (mktemp's /tmp/...) then reach curl unconverted and cannot be
+# written. The conversion is this script's convention, whatever the caller's.
+if [ "$windows" = 1 ]; then unset MSYS_NO_PATHCONV MSYS2_ARG_CONV_EXCL; fi
 bin="$home/.xlings/subos/current/bin"
 xlings="$bin/xlings$exe"
 

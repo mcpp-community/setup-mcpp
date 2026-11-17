@@ -64,6 +64,18 @@ jobs:
           [ "$(xlings --version | head -1 | awk '{print $2}')" = 2026.11.16.1 ]
           mcpp toolchain list | grep -E '^ +\*? +llvm '
 
+  # A workflow that turns off Git Bash's path conversion for its own steps
+  # (MSYS_NO_PATHCONV) still installs: the action keeps its own convention.
+  caller-pathconv:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    env:
+      MSYS_NO_PATHCONV: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+      - run: mcpp --version
+
   # The first job saves the cache; the second, started after it, restores it
   # by the exact key.
   cache-save:

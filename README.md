@@ -2,7 +2,8 @@
 
 A GitHub Action that installs [mcpp](https://github.com/mcpp-community/mcpp), the C++23 modules build tool,
 on Linux, macOS and Windows runners. mcpp is installed through [xlings](https://github.com/openxlings/xlings)
-and placed on `PATH`.
+and placed on `PATH`. On Windows the action's steps run in Git Bash with its path conversion,
+whatever the workflow sets for its own steps (`MSYS_NO_PATHCONV`).
 
 ```yaml
 - uses: mcpp-community/setup-mcpp@v1
